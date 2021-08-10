@@ -1,0 +1,272 @@
+import bezier
+import pygame, sys, random, time
+from pygame.color import THECOLORS
+import math
+from pygame import gfxdraw
+from pygame.locals import *
+
+class Circle():
+    # 获得start_angle开始angle_sum的圆弧点
+    @classmethod
+    def get_pos_list(cls, pos, radius, start_angle, angle_sum, acc=100):
+        return [cls.get_pos_by_angle_circle(pos, radius, start_angle + angle_sum / acc * i) for i in range(acc)]
+
+    # 获得某个圆弧点
+    @classmethod
+    def get_pos_by_angle_circle(cls, center_pos, r_circle, angle):
+        return (center_pos[0] + r_circle * math.sin(angle), center_pos[1] + r_circle * math.cos(angle))
+
+
+class Box():
+    # 双层四边形
+    @classmethod
+    def double_box_w_h(self, box_pos_list, distance=0.13):
+        [left, top, width, height] = box_pos_list
+        return (left + width * distance, top + height * distance
+                , width * (1 - 2 * distance), height * (1 - 2 * distance))
+
+
+#
+flags = DOUBLEBUF
+pygame.init()
+# screen = pygame.display.set_mode([640, 480], flags)
+screen = pygame.display.set_mode([640, 480], flags)
+screen.fill([255, 255, 255])
+clock = pygame.time.Clock()
+delay = 100
+interval = 50
+pygame.key.set_repeat(delay, interval)
+screen_w = screen.get_width()
+screen_h = screen.get_height()
+center = (screen_w / 2, screen_h / 2)
+#
+bezier_color = (242, 190, 110)
+circle_color = (228, 232, 213)
+o_color = (255, 255, 255)
+o_circle_color = (181, 37, 47)
+#
+red_color = (198, 87, 13)
+green_color = (133, 204, 158)
+blue_color = (115, 140, 170)
+#
+color_list = [red_color, green_color, bezier_color]
+#
+acc = 100
+
+
+#
+def draw_google(progress=0, center_pos=center, r_circle=150, line_sum=50, m_color=o_color):
+    # ************************************眼形**********************************************
+    eyes_pos_left = (center_pos[0], center_pos[1] - r_circle)
+    eyes_pos_control = (center_pos[0] / 2, center_pos[1] * 0.4 * ((150 / r_circle) ** 1.5))
+    eyes_pos_right = (0, center_pos[1])
+    # 左上
+    eyes_list = bezier.Bezier.bezier((eyes_pos_left, eyes_pos_control, eyes_pos_right), acc)
+    bezier.draw_lines(eyes_list)
+    # 左下
+    d_eyes_list = bezier.pos_axis_symmetry(eyes_list, (0, center_pos[1]))
+    bezier.draw_lines(d_eyes_list)
+    # 右上
+    r_eyes_list = bezier.pos_axis_symmetry(eyes_list, (center_pos[0], 0))
+    bezier.draw_lines(r_eyes_list)
+    # 右下
+    r_d_eyes_list = bezier.pos_axis_symmetry(r_eyes_list, (0, center_pos[1]))
+    bezier.draw_lines(r_d_eyes_list)
+    # bezier.draw_point((eyes_pos_left, eyes_pos_control, eyes_pos_right), o_circle_color)
+    # 左上、左下对称
+    bezier.draw_area_axis(eyes_list, axis_pos=(center_pos[0], 0), m_color=blue_color)
+    bezier.draw_area_axis(d_eyes_list, axis_pos=(center_pos[0], 0), m_color=blue_color)
+    # *********************************眼球*************************************************
+    # 动态花瓣
+    # line_sum = int(line_sum * abs(progress) + 1) * len(color_list)
+    line_sum = int(line_sum * abs(progress))
+    # 背景圆
+    bezier.draw_point((center_pos,), r_circle=r_circle)
+    # 外中心圆
+    center_r_circle = r_circle * 0.3 * (1 - abs(progress))
+    bezier.draw_point((center_pos,), m_color, center_r_circle)
+    # 内中心圆
+    center_center_r_circle = center_r_circle * 0.9
+    bezier.draw_point((center_pos,), r_circle=center_center_r_circle, m_color=blue_color)
+    if line_sum == 0:
+        return
+    # 角度均分
+    angle_dec = 2 * math.pi / line_sum
+    # 角度差
+    angle_diff = math.pi / line_sum
+    # 各点起始角
+    angle_list = [(2 * math.pi * progress + (angle_dec) * (x + 1)) for x in range(line_sum)]
+    # 背景圆圆点
+    pos_right_list = [Circle.get_pos_by_angle_circle(center_pos, r_circle, angle) for angle in angle_list]
+    # 外中心圆圆点
+    pos_left_list = [Circle.get_pos_by_angle_circle(center_pos, center_r_circle, angle + angle_diff) for angle
+                     in
+                     angle_list]
+    # 圆点绘制
+    # bezier.draw_point(pos_right_list, circle_color)
+    # bezier.draw_point(pos_left_list, circle_color)
+    #
+    for i in range(len(pos_right_list)):
+        # 背景中心圆弧点
+        pos_right_arc_list = Circle.get_pos_list(center_pos, r_circle, angle_list[i],
+                                                 angle_dec, acc)
+        # 外中心圆弧点
+        pos_left_arc_list = Circle.get_pos_list(center_pos, center_r_circle, angle_list[i] + angle_diff,
+                                                angle_dec, acc)
+        # 绘制角度甜甜圈
+        # bezier.draw_area(pos_left_arc_list, pos_right_arc_list, color_list[i % len(color_list)])
+        bezier.draw_area(pos_left_arc_list, pos_right_arc_list, get_random_color())
+        # 两类点连接
+        # bezier.draw_line((pos_left_list[i], pos_right_list[i]), m_color)
+    # 抗锯齿补圆
+    bezier.draw_circle(center_pos, r_circle)
+    bezier.draw_circle(center_pos, center_r_circle)
+    bezier.draw_circle(center_pos, center_center_r_circle)
+
+
+# 绘制双层四边形
+def draw_double_box(box_list, m_color=bezier_color):
+    box_double_list = Box.double_box_w_h(box_list)
+    #
+    bezier.draw_box(bezier.get_box_by_w_h(box_list), m_color)
+    bezier.draw_box(bezier.get_box_by_w_h(box_double_list), m_color)
+    # 左右
+    left_top_pos = (box_list[0], box_list[1])
+    right_top_pos = (box_double_list[0], box_double_list[1])
+    right_bottom_pos = (box_double_list[0], box_double_list[1] + box_double_list[-1])
+    left_bottom_pos = (box_list[0], box_list[1] + box_list[-1])
+    l_r_rect = (left_top_pos, right_top_pos, right_bottom_pos, left_bottom_pos)
+    bezier.draw_box_area(l_r_rect, m_color)
+    bezier.draw_box_area(bezier.pos_axis_symmetry(l_r_rect, (box_list[0] + box_list[-2] / 2, 0)), m_color)
+    # 上下
+    left_top_pos = (box_list[0], box_list[1])
+    right_top_pos = (box_list[0] + box_list[-2], box_list[1])
+    right_bottom_pos = (box_double_list[0] + box_double_list[-2], box_double_list[1])
+    left_bottom_pos = (box_double_list[0], box_double_list[1])
+    u_d_rect = (left_top_pos, right_top_pos, right_bottom_pos, left_bottom_pos)
+    bezier.draw_box_area(u_d_rect, m_color)
+    bezier.draw_box_area(bezier.pos_axis_symmetry(u_d_rect, (0, box_list[1] + box_list[-1] / 2)), m_color)
+
+
+# 检查矩形是否在窗口
+def check_box_in_window(box_list):
+    [left, top, width, height] = box_list
+    center_pos = (left + width / 2, top + height / 2)
+    if center_pos[0] < 0 or center_pos[0] > screen_w or center_pos[1] < 0 or center_pos[1] > screen_h:
+        return False
+    return True
+
+
+# 右下
+def get_r_d_box(box_list, did_pro):
+    return (box_list[0] + box_list[2] * did_pro, box_list[1] + box_list[-1] * did_pro
+            , box_list[2], box_list[-1])
+
+
+# 右上
+def get_r_u_box(box_list, did_pro):
+    return (box_list[0] + box_list[2] * did_pro, box_list[1] - box_list[-1] * did_pro
+            , box_list[2], box_list[-1])
+
+
+# 左下
+def get_l_d_box(box_list, did_pro):
+    return (box_list[0] - box_list[2] * did_pro, box_list[1] + box_list[-1] * did_pro
+            , box_list[2], box_list[-1])
+
+
+# 判断是否压入栈中
+def add_check_all_box(box_list, all_box_list, history_box):
+    if check_box_in_window(box_list):
+        if not (box_list in all_box_list or box_list in history_box):
+            all_box_list.append(box_list)
+    else:
+        draw_double_box(box_list, m_color=get_random_color())
+    return all_box_list
+
+
+def draw_vmware(progress=0, center_pos=(0, 0), w_h=200, did_pro=0.75, m_color=bezier_color):
+    w_h *= abs(progress) + 0.1
+    did_pro *= (1 - abs(progress))
+    # 双层
+    box_list = (center_pos[0], center_pos[1], w_h, w_h)
+    # 堆栈
+    all_box_list = []
+    # 历史记录，防止右上、右下产生重复
+    history_box = []
+    #
+    while check_box_in_window(box_list):
+        # print(box_list)
+        # 画自身
+        draw_double_box(box_list, m_color=get_random_color())
+        # 右上
+        r_u_box_list = get_r_u_box(box_list, did_pro)
+        all_box_list = add_check_all_box(r_u_box_list, all_box_list, history_box)
+        # 右下
+        r_d_box_list = get_r_d_box(box_list, did_pro)
+        all_box_list = add_check_all_box(r_d_box_list, all_box_list, history_box)
+        # 左下
+        l_d_box_list = get_l_d_box(box_list, did_pro)
+        all_box_list = add_check_all_box(l_d_box_list, all_box_list, history_box)
+        # print(len(all_box_list))
+        if all_box_list:
+            box_list = all_box_list.pop()
+            history_box.append(box_list)
+        else:
+            break
+
+
+def draw_visual_studio(progress=0, center_pos=(0, 0), w_h=200, did_pro=0.75, m_color=bezier_color):
+    pass
+
+
+def get_progress(mouse_pos, last_mouse_down_pos):
+    return (mouse_pos[0] - last_mouse_down_pos[0]) / screen_w
+
+
+# 随机色
+def get_random_color():
+    # return [int(random.random() * 255) for i in range(3)]
+    return bezier_color
+
+
+# pyinstaller -F -w draw_icon.py
+if __name__ == '__main__':
+    held_town = False
+    # 振角
+    vibration_angle = math.pi / 2
+    progress = 0
+    #
+    while 1:
+        # 清理窗口
+        screen.fill([255, 255, 255])
+        for event in pygame.event.get():
+            # print(event.type)
+            if event.type == pygame.QUIT:
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                held_town = True
+                mouse_pos = bezier.get_mouse_pos(event.pos)
+                last_mouse_down_pos = mouse_pos
+            elif event.type == pygame.MOUSEBUTTONUP:
+                mouse_pos = bezier.get_mouse_pos(event.pos)
+                if held_town:
+                    held_town = False
+                    progress = get_progress(mouse_pos, last_mouse_down_pos)
+            elif event.type == pygame.MOUSEMOTION:
+                mouse_pos = bezier.get_mouse_pos(event.pos)
+                if held_town:
+                    progress = get_progress(mouse_pos, last_mouse_down_pos)
+            # 丢失焦点,有时需要松开鼠标才能触发
+            elif event.type == pygame.ACTIVEEVENT:
+                # 移出窗口时认为松开鼠标
+                if held_town:
+                    held_town = False
+        draw_google(progress=progress)
+        # draw_vmware(progress=progress)
+        # draw_visual_studio(progress=progress)
+        if not held_town and abs(progress) > 1e-5:
+            # progress_sign = progress / abs(progress)
+            progress *= .95
+        bezier.submit_draw()
+        clock.tick(500)
