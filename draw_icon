@@ -226,8 +226,8 @@ def get_progress(mouse_pos, last_mouse_down_pos):
 
 # 随机色
 def get_random_color():
-    # return [int(random.random() * 255) for i in range(3)]
-    return bezier_color
+    return [int(random.random() * 255) for i in range(3)]
+    # return bezier_color
 
 
 # pyinstaller -F -w draw_icon.py
