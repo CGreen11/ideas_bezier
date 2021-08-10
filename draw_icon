@@ -192,7 +192,7 @@ def draw_vmware(progress=0, center_pos=(0, 0), w_h=200, did_pro=0.75, m_color=be
     box_list = (center_pos[0], center_pos[1], w_h, w_h)
     # 堆栈
     all_box_list = []
-    # 历史记录，防止右上、右下产生重复
+    # 历史记录，防止右上、左下产生重复导致死循环
     history_box = []
     #
     while check_box_in_window(box_list):
