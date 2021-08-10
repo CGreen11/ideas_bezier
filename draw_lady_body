@@ -1,0 +1,220 @@
+import bezier
+import pygame, sys, random, time
+from pygame.color import THECOLORS
+import math
+from pygame import gfxdraw
+
+pygame.init()
+screen = pygame.display.set_mode([640, 480])
+screen.fill([255, 255, 255])
+clock = pygame.time.Clock()
+delay = 100
+interval = 50
+pygame.key.set_repeat(delay, interval)
+bezier_color = (242, 190, 110)
+circle_color = (228, 232, 213)
+o_color = (0, 0, 0)
+o_circle_color = (181, 37, 47)
+w = screen.get_width()
+h = screen.get_height()
+# 臀高
+arm_h = 0.6
+# 臀高
+tun_h = 0.95
+# 裤高
+ku_h = 0.65
+# bezier精度
+bezier_acc = 100
+# 轴
+axis = (w / 2, 0)
+step = 30
+
+
+# 渐缓弯曲的竖线
+def bezier_v_line(point_left, point_right, dis=10, step=10000):
+    if point_right[0] == point_left[0]:
+        h_dis = dis
+        v_dis = point_right[1] - point_left[1]
+    else:
+        h_dis = point_right[0] - point_left[0]
+        v_dis = dis
+    point_control_left = (point_left[0] + h_dis * 0.5, point_left[1] + v_dis * 0.5)
+    # point_control_right = (point_left[0] + h_dis * 1.1, point_left[1] + v_dis * 0.6)
+    # bezier.draw_point((point_left, point_control_left, point_right), o_circle_color)
+    return bezier.Bezier.bezier((point_left, point_control_left, point_right), step)
+
+
+# 摆动
+def shake_boddy(speed):
+    (h_speed, v_speed) = speed
+    # 奶上
+    nai_pos_left = (w * 0.4, 60)
+    nai_pos_control_left = (w * 0.46, 80)
+    nai_pos_control_right = (w * 0.35, 100)
+    nai_pos_right = (w * 0.4, 140)
+    nai_pos_list = bezier.Bezier.bezier(
+        (nai_pos_left, nai_pos_control_left, nai_pos_control_right, nai_pos_right), bezier_acc)
+    bezier_nai_pos_list_sy = bezier.pos_axis_symmetry(nai_pos_list, (nai_pos_control_left[0], 0))
+    # 奶下
+    nai_d_pos_left = nai_pos_right
+    nai_d_pos_right = (axis[0], nai_d_pos_left[1])
+    nai_d_pos_control = ((nai_d_pos_left[0] + nai_d_pos_right[0]) / 2, nai_d_pos_left[1] + 25)
+    bezier_nai_d_pos_list = bezier.Bezier.bezier(
+        (nai_d_pos_left, nai_d_pos_control, nai_d_pos_right), bezier_acc)
+    # 奶点
+    nai_point = (nai_d_pos_control[0], nai_d_pos_control[1] - 20)
+    right_nai_point = bezier.pos_axis_symmetry((nai_point,))[0]
+    # 奶形拼接
+    bezier_nai_pos_list = []
+    bezier_nai_pos_list.extend(nai_pos_list)
+    bezier_nai_pos_list.extend(bezier_nai_d_pos_list)
+    #
+    right_bezier_nai_pos_list = bezier.pos_axis_symmetry(bezier_nai_pos_list, axis)
+    right_bezier_nai_d_pos_list = bezier.pos_axis_symmetry(bezier_nai_d_pos_list, axis)
+    #
+    # bezier.draw_point((nai_pos_left, nai_pos_control_left, nai_pos_control_right, nai_pos_right), o_color)
+    bezier.draw_point((nai_point, right_nai_point))
+    #
+    bezier.draw_lines(bezier_nai_pos_list)
+    bezier.draw_lines(right_bezier_nai_pos_list)
+    #
+    # bezier.draw_area_axis(nai_pos_list, axis)
+    # bezier.draw_area_self(bezier_nai_d_pos_list)
+    # bezier.draw_area_self(right_bezier_nai_d_pos_list)
+    # bezier.draw_area(nai_pos_list, bezier_nai_pos_list_sy)
+    # 腰
+    pos_u_left = (w * 0.38, 0)
+    pos_u_c_left = (pos_u_left[0] * 0.55, 50)
+    pos_u_c_right = (pos_u_left[0] * 1.5, 90)
+    pos_u_right = (pos_u_left[0] * 0.8, h * 0.55)
+    bezier_up_pos_list = bezier.Bezier.bezier((pos_u_left, pos_u_c_left, pos_u_c_right, pos_u_right), bezier_acc)
+    # 臂
+    arm_pos_left = (pos_u_left[0] + 50, pos_u_left[1] + 40)
+    arm_pos_control = (pos_u_left[0] + 50, pos_u_left[1] + 100)
+    arm_pos_right = bezier_up_pos_list[int(len(bezier_up_pos_list) * arm_h)]
+    arm_list = bezier.Bezier.bezier((arm_pos_left, arm_pos_control, arm_pos_right), bezier_acc)
+    # 臀
+    pos_d_r_left = bezier_up_pos_list[int(len(bezier_up_pos_list) * tun_h)]
+    pos_d_r_right = (pos_d_r_left[0] * 1.05, pos_d_r_left[1] * 1.75)
+    pos_d_r_control = (pos_d_r_left[0] * 1.85 + h_speed, pos_d_r_right[1] * 0.8 + v_speed)
+    bezier_down_right_pos_list = bezier.Bezier.bezier((pos_d_r_left, pos_d_r_control, pos_d_r_right), bezier_acc)
+    bezier_down_right_pos_list_clone = bezier_down_right_pos_list
+    # if h_speed != 0:
+    #     pos_d_r_control = (pos_d_r_left[0] * 1.85 - h_speed, pos_d_r_right[1] * 0.8 + v_speed)
+    #     bezier_down_right_pos_list_clone = bezier.Bezier.bezier((pos_d_r_left, pos_d_r_control, pos_d_r_right), bezier_acc)
+    # 裤上
+    pos_d_r_r_left = pos_d_r_left
+    pos_d_r_r_right = (axis[0], pos_d_r_left[1])
+    ku_up = (pos_d_r_r_left, pos_d_r_r_right)
+    # 腿右
+    pos_d_r_d_left = bezier_down_right_pos_list[int(len(bezier_down_right_pos_list) * ku_h)]
+    pos_d_r_d_right = (pos_d_r_d_left[0], h)
+    leg_right = bezier_v_line(pos_d_r_d_left, pos_d_r_d_right, 20, bezier_acc)
+    # 裤下
+    pos_d_r_r_d_left = pos_d_r_d_left
+    pos_d_r_r_d_right = (axis[0], pos_d_r_r_d_left[1])
+    ku_down = bezier_v_line(pos_d_r_r_d_left, pos_d_r_r_d_right, 20, bezier_acc)
+    # 裤面
+    ku_area = bezier_down_right_pos_list[:int(len(bezier_down_right_pos_list) * ku_h)]
+    # 腿左
+    pos_d_left = pos_u_right
+    pos_d_right = (pos_d_left[0] * 0.9, h)
+    pos_d_control = (pos_d_left[0] * 0.7, pos_d_right[1] * 0.65)
+    bezier_down_pos_list = bezier.Bezier.bezier((pos_d_left, pos_d_control, pos_d_right), bezier_acc)
+    #
+    right_bezier_up_pos_list = bezier.pos_axis_symmetry(bezier_up_pos_list, axis)
+    right_bezier_down_right_pos_list = bezier.pos_axis_symmetry(bezier_down_right_pos_list_clone, axis)
+    right_bezier_down_pos_list = bezier.pos_axis_symmetry(bezier_down_pos_list, axis)
+    right_pos_d_r_d = bezier.pos_axis_symmetry(leg_right, axis)
+    right_pos_d_r_r = bezier.pos_axis_symmetry(ku_up, axis)
+    right_pos_d_r_r_d = bezier.pos_axis_symmetry(ku_down, axis)
+    right_arm_list = bezier.pos_axis_symmetry(arm_list, axis)
+    #
+    # 脊柱
+    bezier.draw_line((axis, (axis[0], 230)))
+    # 腰
+    bezier.draw_lines(bezier_up_pos_list)
+    bezier.draw_lines(right_bezier_up_pos_list)
+    # 臂
+    bezier.draw_lines(arm_list)
+    bezier.draw_lines(right_arm_list)
+    # 臀
+    bezier.draw_lines(bezier_down_right_pos_list)
+    bezier.draw_lines(right_bezier_down_right_pos_list)
+    # 腿左
+    bezier.draw_lines(bezier_down_pos_list)
+    bezier.draw_lines(right_bezier_down_pos_list)
+    # 腿右
+    bezier.draw_lines(leg_right)
+    bezier.draw_lines(right_pos_d_r_d)
+    # 裤上
+    bezier.draw_lines(ku_up)
+    bezier.draw_lines(right_pos_d_r_r)
+    # 裤下
+    bezier.draw_lines(ku_down)
+    bezier.draw_lines(right_pos_d_r_r_d)
+    # 裤面
+    bezier.draw_area_axis(ku_area, axis)
+    bezier.draw_area_self(ku_down)
+    bezier.draw_area_self(right_pos_d_r_r_d)
+    #
+    # bezier.draw_point((arm_pos_left, arm_pos_control, arm_pos_right))
+    # bezier.draw_point((pos_u_left, pos_u_c_left, pos_u_c_right, pos_u_right), bezier_color)
+    # bezier.draw_point((pos_d_left, pos_d_control, pos_d_right), o_color)
+    # bezier.draw_point((pos_d_r_left, pos_d_r_control, pos_d_r_right), o_circle_color)
+    # bezier.draw_point((pos_d_r_d_left, pos_d_r_d_right), bezier_color)
+    bezier.submit_draw()
+
+
+# 拖拽比例
+def get_speed(mouse_pos, last_mouse_down_pos, step=30):
+    h_speed = mouse_pos[0] - last_mouse_down_pos[0]
+    v_speed = mouse_pos[1] - last_mouse_down_pos[1]
+    if abs(v_speed) > abs(h_speed):
+        h_speed = 0
+        v_speed = v_speed / h * step
+    else:
+        v_speed = 0
+        h_speed = h_speed / w * step
+    return (h_speed, v_speed)
+
+
+if __name__ == '__main__':
+    held_town = False
+    # 振角
+    vibration_angle = math.pi / 2
+    h_speed = 0
+    v_speed = 0
+    #
+    while 1:
+        # 清理窗口
+        screen.fill([255, 255, 255])
+        for event in pygame.event.get():
+            # print(event.type)
+            if event.type == pygame.QUIT:
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                held_town = True
+                mouse_pos = bezier.get_mouse_pos(event.pos)
+                last_mouse_down_pos = mouse_pos
+            elif event.type == pygame.MOUSEBUTTONUP:
+                mouse_pos = bezier.get_mouse_pos(event.pos)
+                if held_town:
+                    (h_speed, v_speed) = get_speed(mouse_pos, last_mouse_down_pos)
+                    held_town = False
+            elif event.type == pygame.MOUSEMOTION:
+                if held_town:
+                    (h_speed, v_speed) = get_speed(bezier.get_mouse_pos(event.pos), last_mouse_down_pos)
+            # 丢失焦点,有时需要松开鼠标才能触发
+            elif event.type == pygame.ACTIVEEVENT:
+                # 移出窗口时认为松开鼠标
+                if held_town:
+                    held_town = False
+        shake_boddy((h_speed * math.sin(vibration_angle), v_speed * math.sin(vibration_angle)))
+        if not held_town and (h_speed + v_speed) > 1e-5:
+            # 振角移动
+            vibration_angle += math.pi / 8
+            # 振幅损耗
+            h_speed *= 0.8
+            v_speed *= 0.8
+        clock.tick(60)
